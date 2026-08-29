@@ -85,8 +85,8 @@ curl http://127.0.0.1:8000/users
 
 ```json
 [
-  {"id": 1, "name": "Ana Torres", "email": "ana@correo.com", "role": "admin", "is_active": true},
-  {"id": 2, "name": "Luis Ramirez", "email": "luis@correo.com", "role": "user", "is_active": true}
+  {"id": 1, "name": "luisa Torres", "email": "luisa@correo.com", "role": "admin", "is_active": true},
+  {"id": 2, "name": "Luis vasques", "email": "luis@correo.com", "role": "user", "is_active": true}
 ]
 ```
 
@@ -97,7 +97,7 @@ curl http://127.0.0.1:8000/users/1
 ```
 
 ```json
-{"id": 1, "name": "Ana Torres", "email": "ana@correo.com", "role": "admin", "is_active": true}
+{"id": 1, "name": "luisa Torres", "email": "ana@correo.com", "role": "admin", "is_active": true}
 ```
 
 Si el id no existe, responde **404**:
@@ -141,13 +141,13 @@ Las pruebas se realizaron con **Postman**, con el servidor corriendo localmente
 
 ### GET /users — listar todos
 
-![GET /users](images/2026-08-29_00h27_26.png)
+![GET /users](images/2026-08-29_00h29_47.png)
 
 Responde `200 OK` con los 3 usuarios de ejemplo cargados al iniciar la API.
 
 ### GET /users?role=admin — filtro por Query Parameter
 
-![GET /users con filtro de rol](images/2026-08-29_00h29_47.png)
+![GET /users con filtro de rol](images/2026-08-29_00h27_26.png)
 
 Responde `200 OK`, y la lista queda filtrada solo al usuario con `role: "admin"`.
 
