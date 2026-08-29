@@ -8,9 +8,9 @@ from app.schemas.user_schema import UserCreate, UserResponse
 router = APIRouter(prefix="/users", tags=["Usuarios"])
 
 usuarios_db = [
-    {"id": 1, "name": "Ana Torres", "email": "ana@correo.com", "role": "admin", "is_active": True},
-    {"id": 2, "name": "Luis Ramirez", "email": "luis@correo.com", "role": "user", "is_active": True},
-    {"id": 3, "name": "Camilo Sarrazola", "email": "camilo@correo.com", "role": "support", "is_active": False},
+    {"id": 1, "name": "luisa Torres", "email": "luisa@correo.com", "role": "admin", "is_active": True},
+    {"id": 2, "name": "Luis vasques", "email": "luis@correo.com", "role": "user", "is_active": True},
+    {"id": 3, "name": "jeferson estiven", "email": "estive@correo.com", "role": "support", "is_active": False},
 ]
 
 contador_id = 4
