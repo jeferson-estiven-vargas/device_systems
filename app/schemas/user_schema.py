@@ -1,28 +1,34 @@
 # app/schemas/user_schema.py
 # Modelos de datos (Pydantic v2) para validar entradas y estructurar salidas
 
-from typing import Literal
+from typing import Literal, Optional
 from pydantic import BaseModel, EmailStr, Field
 
 
 class UserBase(BaseModel):
-    """Campos comunes a todo usuario, compartidos entre entrada y salida."""
-
     name: str = Field(..., min_length=3, description="Nombre completo del usuario")
-    email: EmailStr = Field(..., description="Correo electrónico único del usuario")
+    email: EmailStr = Field(..., description="Correo electronico unico del usuario")
     role: Literal["admin", "support", "user"] = Field(..., description="Rol del usuario en el sistema")
-    is_active: bool = Field(default=True, description="Indica si el usuario está activo")
+    is_active: bool = Field(default=True, description="Indica si el usuario esta activo")
 
 
 class UserCreate(UserBase):
-    """Modelo de ENTRADA: lo que se recibe en el body del POST /users."""
     pass
 
 
-class UserResponse(UserBase):
-    """Modelo de SALIDA: lo que la API devuelve (incluye el id generado)."""
+class UserUpdate(UserBase):
+    pass
 
-    id: int = Field(..., description="Identificador único del usuario")
+
+class UserPatch(BaseModel):
+    name: Optional[str] = Field(None, min_length=3)
+    email: Optional[EmailStr] = Field(None)
+    role: Optional[Literal["admin", "support", "user"]] = Field(None)
+    is_active: Optional[bool] = Field(None)
+
+
+class UserResponse(UserBase):
+    id: int = Field(..., description="Identificador unico del usuario")
 
     class Config:
         from_attributes = True
