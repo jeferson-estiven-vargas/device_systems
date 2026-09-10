@@ -1,56 +1,51 @@
 # app/routes/user_routes.py
-# Endpoints del recurso "users": listar, consultar por id, filtrar y crear
-
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Query, status
-from app.schemas.user_schema import UserCreate, UserResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from app.dependencies.user_dependencies import get_user_or_404
+from app.schemas.user_schema import UserCreate, UserPatch, UserResponse, UserUpdate
+from app.services import user_service
 
-router = APIRouter(prefix="/users", tags=["Usuarios"])
-
-usuarios_db = [
-    {"id": 1, "name": "Ana Torres", "email": "ana@correo.com", "role": "admin", "is_active": True},
-    {"id": 2, "name": "Luis Ramirez", "email": "luis@correo.com", "role": "user", "is_active": True},
-    {"id": 3, "name": "Camilo Sarrazola", "email": "camilo@correo.com", "role": "support", "is_active": False},
-]
-
-contador_id = 4
+router = APIRouter(prefix="/users", tags=["Users"])
 
 
-@router.get("", response_model=List[UserResponse])
+@router.get("", response_model=List[UserResponse], summary="Listar usuarios")
 def listar_usuarios(
-    role: Optional[str] = Query(None, description="Filtrar por rol: admin, support o user"),
-    is_active: Optional[bool] = Query(None, description="Filtrar por estado activo/inactivo"),
+    role: Optional[str] = Query(None),
+    is_active: Optional[bool] = Query(None),
 ):
-    resultado = usuarios_db
-    if role is not None:
-        resultado = [u for u in resultado if u["role"] == role]
-    if is_active is not None:
-        resultado = [u for u in resultado if u["is_active"] == is_active]
-    return resultado
+    return user_service.listar_usuarios(role=role, is_active=is_active)
 
 
-@router.get("/{user_id}", response_model=UserResponse)
-def obtener_usuario(user_id: int):
-    for usuario in usuarios_db:
-        if usuario["id"] == user_id:
-            return usuario
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"No existe un usuario con id {user_id}",
-    )
+@router.get("/{user_id}", response_model=UserResponse, summary="Consultar un usuario")
+def obtener_usuario(usuario: dict = Depends(get_user_or_404)):
+    return usuario
 
 
-@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED, summary="Registrar un usuario")
 def crear_usuario(usuario: UserCreate):
-    global contador_id
-    correo_existente = any(u["email"] == usuario.email for u in usuarios_db)
-    if correo_existente:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Ya existe un usuario registrado con el correo {usuario.email}",
-        )
-    nuevo_usuario = usuario.model_dump()
-    nuevo_usuario["id"] = contador_id
-    contador_id += 1
-    usuarios_db.append(nuevo_usuario)
-    return nuevo_usuario
+    if user_service.correo_ya_existe(usuario.email):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Ya existe un usuario registrado con el correo {usuario.email}")
+    return user_service.crear_usuario(usuario.model_dump())
+
+
+@router.put("/{user_id}", response_model=UserResponse, summary="Actualizar un usuario (completo)")
+def actualizar_usuario(datos: UserUpdate, usuario_existente: dict = Depends(get_user_or_404)):
+    if user_service.correo_ya_existe(datos.email, excluir_id=usuario_existente["id"]):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Ya existe un usuario registrado con el correo {datos.email}")
+    return user_service.actualizar_usuario_completo(usuario_existente["id"], datos.model_dump())
+
+
+@router.patch("/{user_id}", response_model=UserResponse, summary="Actualizar un usuario (parcial)")
+def actualizar_usuario_parcial(datos: UserPatch, usuario_existente: dict = Depends(get_user_or_404)):
+    campos_enviados = datos.model_dump(exclude_unset=True)
+    if not campos_enviados:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Debes enviar al menos un campo para actualizar")
+    if "email" in campos_enviados and user_service.correo_ya_existe(campos_enviados["email"], excluir_id=usuario_existente["id"]):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Ya existe un usuario registrado con el correo {campos_enviados['email']}")
+    return user_service.actualizar_usuario_parcial(usuario_existente["id"], campos_enviados)
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_200_OK, summary="Eliminar un usuario")
+def eliminar_usuario(usuario_existente: dict = Depends(get_user_or_404)):
+    user_service.eliminar_usuario(usuario_existente["id"])
+    return {"detail": f"Usuario con id {usuario_existente['id']} eliminado correctamente"}
