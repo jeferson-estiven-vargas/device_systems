@@ -46,8 +46,8 @@ uvicorn app.main:app --reload
 
 Al arrancar, se crea automáticamente `device_systems.db` con la tabla `users` lista (no requiere scripts aparte).
 
-![Servidor corriendo y estructura del proyecto](images/servidor-corriendo.png)
-![Swagger UI con los endpoints](images/swagger-docs.png)
+![Servidor corriendo y estructura del proyecto](images/2026-09-18_20h26_25.png.png)
+
 
 ## Estructura del proyecto
 
@@ -164,10 +164,10 @@ class UserResponse(UserBase):
 ## Pruebas en Postman
 
 ### POST /users — creación exitosa (`201`)
-![POST exitoso](images/postman-post-exitoso.png)
+![POST exitoso](images/postman_post_exitoso.png)
 
 ### POST /users — correo duplicado (`400`)
-![POST correo duplicado](images/postman-post-duplicado.png)
+![POST correo duplicado](images/postman_post_duplicado.png)
 
 ### POST /users — datos inválidos (`422`)
 ![POST datos inválidos](images/postman-post-invalido.png)
@@ -235,3 +235,6 @@ class UserResponse(UserBase):
 | Nombre corto / email inválido / rol no permitido | `422` | Error detallado de Pydantic por campo |
 
 ## Reflexión final
+Pasar de una lista en memoria a una base de datos real con SQLAlchemy cambia por completo la confiabilidad de la API. En la EV08, cada reinicio del servidor borraba todos los usuarios: la API "olvidaba" todo lo que había pasado, lo cual es inaceptable para cualquier sistema real (un usuario no puede desaparecer solo porque el servidor se reinició por un despliegue o una caída). Con SQLite y SQLAlchemy, los datos quedan en device_systems.db y sobreviven a reinicios, actualizaciones de código e incluso a que el equipo se apague — que es, en el fondo, lo que un usuario final espera de cualquier aplicación: que su información no se pierda.
+
+Trabajar con SQLAlchemy en lugar de una lista de Python se sintió más estructurado, pero también más exigente. Con una lista, cualquier validación (evitar correos duplicados, por ejemplo) había que programarla a mano recorriendo los elementos. Con SQLAlchemy, restricciones como unique=True o nullable=False quedan garantizadas por la propia base de datos, así que el motor rechaza automáticamente datos inválidos aunque el código de arriba tenga un error. A cambio, hay que pensar en sesiones (SessionLocal), en cuándo hacer commit/rollback, y en que cada petición HTTP debe abrir y cerrar su propia sesión — algo que con una lista en memoria simplemente no existía.
