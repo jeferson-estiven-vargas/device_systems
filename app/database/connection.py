@@ -1,6 +1,4 @@
 # app/database/connection.py
-# Configuracion de la base de datos: engine, sesion y base declarativa
-
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
