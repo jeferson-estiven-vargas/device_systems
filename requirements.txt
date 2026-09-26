@@ -20,5 +20,7 @@ alembic==1.20.0
 # EV11 - Seguridad y autenticacion
 python-jose[cryptography]
 passlib[bcrypt]
+bcrypt==4.0.1
 slowapi
 python-multipart
+python-dotenv
