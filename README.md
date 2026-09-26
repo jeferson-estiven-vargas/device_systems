@@ -1,213 +1,320 @@
 # device_systems
 
-API REST desarrollada con **FastAPI** para la gestión de usuarios, dispositivos y préstamos, con persistencia en base de datos mediante **SQLAlchemy**, migraciones controladas con **Alembic**, relaciones entre modelos y consultas avanzadas con **joins** y filtros.
+API REST desarrollada con **FastAPI** para la gestión de usuarios, dispositivos y préstamos del sistema `device_systems`. Esta es la evolución final del proyecto (EV11): una API **protegida y lista para producción**, con autenticación OAuth2 + JWT, hash de contraseñas, autorización por roles, middleware personalizado, CORS y rate limiting.
 
-Proyecto desarrollado por: **jeferson estiven vargas**
+## Descripción de la API
 
----
+`device_systems` expone los recursos:
 
-## Evolución del proyecto
+- `/auth` — registro, login y perfil del usuario autenticado.
+- `/users` — gestión de usuarios.
+- `/devices` — gestión de dispositivos (protegido por rol).
+- `/loans` — gestión de préstamos.
 
-- **EV09**: migración de almacenamiento en memoria a persistencia con SQLAlchemy + SQLite, CRUD completo de `users`.
-- **EV10** *(actual)*: incorporación de Alembic, nuevos recursos `devices` y `loans`, relaciones entre modelos, consultas con joins y filtros avanzados.
+Funcionalidades principales:
 
----
+- Registro de usuarios con contraseña segura (hash con `bcrypt` vía `passlib`).
+- Autenticación OAuth2 con tokens JWT (`python-jose`).
+- Protección de rutas mediante dependencias (`get_current_active_user`, `require_roles`, `require_admin`).
+- Autorización basada en roles (`admin`, `support`, `user`).
+- Middleware personalizado de trazabilidad (tiempo de respuesta, `X-Request-ID`, logging).
+- CORS configurado para clientes frontend autorizados.
+- Rate limiting con `slowapi` en endpoints sensibles.
+- Validaciones avanzadas con Pydantic v2.
+
+## Tecnologías utilizadas
+
+| Tecnología | Uso |
+|---|---|
+| Python | Lenguaje base |
+| FastAPI | Framework principal de la API |
+| Pydantic v2 | Validación y serialización de datos |
+| SQLAlchemy | ORM y persistencia |
+| Alembic | Migraciones de base de datos |
+| Uvicorn | Servidor ASGI |
+| passlib[bcrypt] (bcrypt==4.0.1) | Hash seguro de contraseñas |
+| python-jose[cryptography] | Generación y validación de tokens JWT |
+| python-dotenv | Carga de variables de entorno desde `.env` |
+| python-multipart | Procesamiento de formularios (login OAuth2) |
+| slowapi | Rate limiting |
+| Swagger UI / ReDoc | Documentación automática |
 
 ## Estructura del proyecto
 
+```
 device_systems/
-│── app/
-│ │── main.py
-│ │
-│ │── database/
-│ │ │── connection.py
-│ │
-│ │── models/
-│ │ │── user_model.py
-│ │ │── device_model.py
-│ │ │── loan_model.py
-│ │
-│ │── schemas/
-│ │ │── user_schema.py
-│ │ │── device_schema.py
-│ │ │── loan_schema.py
-│ │
-│ │── routes/
-│ │ │── user_routes.py
-│ │ │── device_routes.py
-│ │ │── loan_routes.py
-│ │ │── user_loan_routes.py
-│ │
-│ │── services/
-│ │ │── user_service.py
-│ │ │── device_service.py
-│ │ │── loan_service.py
-│ │
-│ │── dependencies/
-│ │── database_dependency.py
-│ │── user_dependencies.py
-│
-│── alembic/
-│ │── versions/
-│
-│── alembic.ini
-│── requirements.txt
-│── README.md
-
-
----
-
-## Modelos y relaciones
-
-| Modelo | Descripción |
-|---|---|
-| `User` | Usuarios del sistema (`name`, `email`, `role`, `is_active`, `created_at`) |
-| `Device` | Dispositivos disponibles para préstamo (`name`, `serial_number`, `device_type`, `brand`, `is_available`, `created_at`) |
-| `Loan` | Registro de préstamo de un dispositivo a un usuario (`user_id`, `device_id`, `loan_date`, `return_date`, `status`) |
-
-**Relaciones (`relationship()` + `back_populates`):**
-- Un usuario puede tener muchos préstamos (`User.loans` ↔ `Loan.user`)
-- Un dispositivo puede aparecer en muchos préstamos históricos (`Device.loans` ↔ `Loan.device`)
-- Cada préstamo pertenece a un usuario y a un dispositivo (`ForeignKey` + integridad referencial)
-
----
-
-## Migraciones con Alembic
-
-Instalación e inicialización:
-
-```bash
-pip install alembic
-alembic init alembic
+├── app/
+│   ├── main.py                          # Punto de entrada: FastAPI, CORS, middleware, rate limiter, routers
+│   ├── auth/
+│   │   ├── auth_routes.py               # Endpoints /auth (register, login, me)
+│   │   ├── auth_service.py              # Lógica de registro y autenticación
+│   │   └── security.py                  # Hash de contraseñas y JWT (crear/validar)
+│   ├── database/
+│   │   └── connection.py                # Engine, SessionLocal, Base declarativa
+│   ├── models/
+│   │   ├── user_model.py                # User (con hashed_password, role, is_active)
+│   │   ├── device_model.py              # Device
+│   │   └── loan_model.py                # Loan
+│   ├── schemas/
+│   │   ├── user_schema.py               # Schemas de User
+│   │   ├── device_schema.py             # Schemas de Device
+│   │   ├── loan_schema.py               # Schemas de Loan
+│   │   └── auth_schema.py               # UserRegister, UserLogin, Token, TokenData
+│   ├── routes/
+│   │   ├── user_routes.py               # Endpoints /users
+│   │   ├── device_routes.py             # Endpoints /devices (protegidos por rol)
+│   │   ├── loan_routes.py               # Endpoints /loans
+│   │   └── user_loan_routes.py          # Endpoints de préstamos por usuario
+│   ├── services/
+│   │   ├── user_service.py
+│   │   ├── device_service.py
+│   │   └── loan_service.py
+│   ├── dependencies/
+│   │   ├── database_dependency.py       # get_db
+│   │   ├── user_dependencies.py
+│   │   ├── device_dependencies.py
+│   │   ├── loan_dependencies.py
+│   │   └── auth_dependency.py           # get_current_user, get_current_active_user, require_roles, require_admin
+│   └── middlewares/
+│       ├── request_middleware.py        # Trazabilidad: X-Process-Time, X-Request-ID, logging
+│       └── rate_limiter.py              # Instancia compartida de Limiter (slowapi)
+├── alembic/
+│   └── versions/
+├── .env                                 # Variables de entorno (no versionado)
+├── .env.example                         # Plantilla de variables de entorno
+├── alembic.ini
+├── requirements.txt
+└── README.md
 ```
 
-![Ejecución de alembic init](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/alembic_init.png)
+## Variables de entorno
 
-Generación de la migración (autogenerada a partir de los modelos `Device` y `Loan`):
+Copia `.env.example` a `.env` y define:
 
-```bash
-alembic revision --autogenerate -m "create devices and loans tables"
+```
+SECRET_KEY=genera-una-clave-con-python -c "import secrets; print(secrets.token_hex(32))"
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
 
-![Creación de migración con autogenerate](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/alembic_revision_autogenerate.png)
+Se cargan con `python-dotenv` al iniciar la aplicación.
 
-Aplicación de la migración:
+## Instalación y ejecución
 
 ```bash
+git clone <url-del-repositorio>
+cd device_systems
+git checkout device_systems_security
+
+# Crea y activa el entorno virtual, luego:
+pip install -r requirements.txt
+
+# Configura tu .env (ver sección anterior)
+
 alembic upgrade head
+
+uvicorn app.main:app --reload
 ```
 
-![Aplicación de migración](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/alembic_init.png)
+El servidor queda disponible en:
 
-Historial de migraciones aplicadas:
+- API: `http://127.0.0.1:8000`
+- Swagger UI: `http://127.0.0.1:8000/docs`
+- ReDoc: `http://127.0.0.1:8000/redoc`
 
-```bash
-alembic history
-alembic current
-```
+## Roles del sistema
 
-![Historial de migraciones](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/alembic_history.png)
+| Rol | Descripción |
+|---|---|
+| `admin` | Acceso total: crear, actualizar y eliminar dispositivos; gestionar préstamos. |
+| `support` | Puede crear y actualizar dispositivos, gestionar devoluciones de préstamos; no puede eliminar dispositivos. |
+| `user` | Puede consultar usuarios/dispositivos y crear préstamos, sin permisos administrativos. |
 
-Estructura de tablas generadas en la base de datos:
+## Tabla de endpoints y protección
 
-![Estructura de tablas](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/estructura_tablas.png)
-
----
-
-## Documentación Swagger / OpenAPI
-
-Disponible en `/docs` (Swagger UI) y `/redoc`, organizada por tags: **Users**, **Devices**, **Loans**.
-
-![Swagger UI - vista general](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/02_swagger_general.png)
-
----
-
-## Fase 13 – Pruebas funcionales mínimas (GFPI-F-135 V04)
-
-Escenarios probados de extremo a extremo con Postman, sobre una base de datos migrada desde cero con Alembic.
-
-| # | Escenario | Método y endpoint | Evidencia |
+| Recurso | Método | Ruta | Protección |
 |---|---|---|---|
-| 1 | Ejecutar migraciones con Alembic | Terminal: `alembic upgrade head` | ![Migraciones Alembic](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/01_alembic_upgrade_head.png) |
-| 2 | Crear usuario | `POST /users` | ![Crear usuario](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/03_postman_post_usuario_creado.png) |
-| 3 | Crear dispositivo | `POST /devices` | ![Crear dispositivo](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/04_postman_post_dispositivo_creado.png) |
-| 4 | Crear préstamo | `POST /loans` | ![Crear préstamo](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/05_postman_post_prestamo_creado.png) |
-| 5 | Intentar prestar un dispositivo no disponible | `POST /loans` → 409 Conflict | ![Dispositivo no disponible](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/06_postman_post_prestamo_conflicto_409.png) |
-| 6 | Listar préstamos con información de usuario y dispositivo | `GET /loans/details` | ![Préstamos con detalle](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/07_postman_get_prestamos_detalle.png) |
-| 7 | Filtrar préstamos por estado | `GET /loans/details?status=active` | ![Filtro por estado](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/08_postman_get_prestamos_filtro_estado.png) |
-| 8 | Filtrar préstamos por tipo de dispositivo | `GET /loans/details?device_type=laptop` | ![Filtro por tipo](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/09_postman_get_prestamos_filtro_tipo.png) |
-| 9 | Consultar préstamos de un usuario | `GET /users/{user_id}/loans` | ![Préstamos de un usuario](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/10_postman_get_prestamos_usuario.png) |
-| 10 | Devolver un dispositivo | `PATCH /loans/{loan_id}/return` | ![Devolver dispositivo](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/11_postman_patch_prestamo_devolucion.png) |
-| 11 | Validar que el dispositivo vuelva a estar disponible | `GET /devices/{device_id}` (`is_available: true`) | ![Dispositivo disponible](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/12_postman_get_dispositivo_disponible.png) |
-| 12 | Consultar historial de préstamos del dispositivo | `GET /devices/{device_id}/loans` | ![Historial del dispositivo](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/13_postman_get_historial_dispositivo.png) |
+| Auth | POST | `/auth/register` | Pública (3/minuto) |
+| Auth | POST | `/auth/login` | Pública (5/minuto) |
+| Auth | GET | `/auth/me` | Autenticado |
+| Usuarios | GET | `/users` | Autenticado (30/minuto) |
+| Usuarios | GET | `/users/{user_id}` | Autenticado |
+| Usuarios | GET | `/users/{user_id}/loans` | Autenticado |
+| Usuarios | POST/PUT/PATCH/DELETE | `/users/{user_id}` | Sin protección adicional* |
+| Dispositivos | GET | `/devices`, `/devices/{id}` | Pública |
+| Dispositivos | POST | `/devices` | admin o support |
+| Dispositivos | PUT | `/devices/{device_id}` | admin o support |
+| Dispositivos | PATCH | `/devices/{device_id}` | Sin protección adicional* |
+| Dispositivos | DELETE | `/devices/{device_id}` | admin |
+| Préstamos | GET | `/loans` | Sin protección adicional* |
+| Préstamos | POST | `/loans` | Autenticado (10/minuto) |
+| Préstamos | PATCH | `/loans/{loan_id}/return` | admin o support |
+| Préstamos | GET | `/loans/details` | admin o support |
 
----
+\* Decisión documentada: la guía no exige proteger estas rutas en esta evolución; quedan pendientes para una futura iteración.
 
-## Evidencias funcionales
+## Autenticación: registro, login y tokens
 
-### Gestión de usuarios
+### Registro — `POST /auth/register`
 
-| Acción | Evidencia |
+```json
+{
+  "name": "Nombre Apellido",
+  "email": "usuario@example.com",
+  "password": "MiPass123",
+  "role": "user"
+}
+```
+
+La contraseña debe tener mínimo 8 caracteres, al menos una mayúscula, una minúscula, un número, y no contener espacios. La contraseña nunca se guarda en texto plano: se hashea con `bcrypt` antes de persistirse, y el campo `hashed_password` nunca se expone en las respuestas.
+
+### Login — `POST /auth/login`
+
+Recibe las credenciales como **form-data** (estándar `OAuth2PasswordRequestForm`, campo `username` = email), no como JSON — esto permite que el botón **Authorize** de Swagger funcione automáticamente.
+
+**Respuesta:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer"
+}
+```
+
+### Perfil autenticado — `GET /auth/me`
+
+Requiere header `Authorization: Bearer <token>`. Retorna los datos del usuario dueño del token, sin `hashed_password`.
+
+## Middleware personalizado
+
+Cada petición pasa por `request_tracing_middleware`, que agrega:
+
+- `X-App-Name: device_systems`
+- `X-Process-Time`: tiempo de procesamiento en segundos.
+- `X-Request-ID`: identificador único de la petición (reutiliza el del cliente si lo envía, o genera uno nuevo).
+
+Además, registra en el log el método, la ruta, el código de estado y la duración de cada petición.
+
+## Configuración de CORS
+
+Se configuró `CORSMiddleware` permitiendo los orígenes de desarrollo local `http://localhost:5173` (Vite) y `http://localhost:3000` (React), con `allow_credentials=True`, `allow_methods=["*"]` y `allow_headers=["*"]`.
+
+**¿Por qué no usar `allow_origins=["*"]` en producción cuando hay credenciales?**
+
+El comodín `"*"` combinado con `allow_credentials=True` está prohibido por la especificación CORS (y Starlette lo rechaza en tiempo de ejecución). La razón es de seguridad: si el servidor aceptara credenciales desde *cualquier* origen sin distinción, un sitio malicioso podría hacer peticiones autenticadas a la API en nombre de un usuario con sesión activa, sin que el navegador lo impidiera — justo lo que CORS existe para evitar. Por eso, en producción, `allow_origins` debe listar explícitamente los dominios exactos del frontend autorizado.
+
+## Rate limiting
+
+Implementado con `slowapi`, identificando clientes por dirección IP:
+
+| Endpoint | Límite |
 |---|---|
-| Listar usuarios | ![Listar usuarios](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/postman_get_users.png) |
-| Crear usuario | ![Crear usuario](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/postman_post_user_exitoso.png) |
+| `POST /auth/register` | 3 por minuto |
+| `POST /auth/login` | 5 por minuto |
+| `GET /users` | 30 por minuto |
+| `POST /loans` | 10 por minuto |
 
-### Gestión de dispositivos
+Al superar el límite, la API responde `429 Too Many Requests`.
 
-| Acción | Evidencia |
+## Pruebas funcionales mínimas
+
+| # | Escenario |
 |---|---|
-| Crear dispositivo | ![Crear dispositivo](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/postman_post_device_exitoso.png) |
-| Serial duplicado (error) | ![Serial duplicado](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/postman_post_device_serial_duplicado_400.png) |
-| Consultar dispositivo puntual | ![Consultar dispositivo](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/postman_get_device_puntual.png) |
-| Dispositivo inexistente (error) | ![Dispositivo inexistente](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/postman_get_device_404.png) |
+| 1 | Registro de usuario |
+| 2 | Registro con contraseña débil |
+| 3 | Registro con email duplicado |
+| 4 | Login correcto |
+| 5 | Login con contraseña incorrecta |
+| 6 | Consulta de `/auth/me` |
+| 7 | Acceso a ruta protegida sin token |
+| 8 | Acceso con token inválido |
+| 9 | Acceso con usuario sin permisos |
+| 10 | Creación de dispositivo con rol permitido |
+| 11 | Eliminación de dispositivo con rol no permitido |
+| 12 | Configuración CORS |
+| 13 | Cabeceras generadas por middleware |
+| 14 | Activación de rate limiting |
+| 15 | Verificación de Swagger/OpenAPI |
 
-### Gestión de préstamos
+## Evidencia de pruebas funcionales
 
-| Acción | Evidencia |
-|---|---|
-| Crear préstamo | ![Crear prestamo](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/postman_post_loan_exitoso.png) |
-| Dispositivo no disponible (error) | ![Dispositivo no disponible](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/postman_post_loan_409_no_disponible.png) |
-| Devolver dispositivo | ![Devolver dispositivo](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/postman_patch_loan_return_exitoso.png) |
-| Préstamo ya devuelto (error) | ![Prestamo ya devuelto](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/postman_patch_loan_return_409.png) |
+> Las capturas se encuentran en `imagenes/evo11/` dentro del proyecto (ruta local: `C:\Users\El Sarra\Desktop\device_systems\imagenes\evo11`). Reemplaza los nombres de archivo por los de tus propias capturas.
 
-### Consultas con joins
+### Estructura del proyecto
 
-| Acción | Evidencia |
-|---|---|
-| Préstamos con información relacionada (`/loans/details`) | ![Loans details](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/postman_get_loans_details.png) |
-| Préstamos de un usuario (`/users/{id}/loans`) | ![Loans de un usuario](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/postman_get_user_loans.png) |
-| Historial de préstamos de un dispositivo (`/devices/{id}/loans`) | ![Historial de dispositivo](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/postman_get_device_loans.png) |
+![Estructura del proyecto](imagenes/evo11/estructura_proyecto.png)
 
-### Filtros aplicados
+### Migración Alembic aplicada
 
-| Filtro | Evidencia |
-|---|---|
-| Préstamos por estado (`?status=active`) | ![Filtro por estado](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/postman_get_loans_filter_status.png) |
-| Préstamos por tipo de dispositivo (`?device_type=laptop`) | ![Filtro por tipo](C:/Users/estiv/OneDrive/Desktop/device_systems/images/evo10/postman_get_loans_filter_device_type.png) |
+![Migración Alembic aplicada](imagenes/evo11/alembic_head.png)
 
----
+### Registro de usuario
 
-## Manejo de errores
+![Registro exitoso](imagenes/evo11/registro_exitoso.png)
 
-| Caso | Código |
-|---|---|
-| Registro creado | 201 Created |
-| Consulta exitosa | 200 OK |
-| Devolución exitosa | 200 OK |
-| Eliminación exitosa | 204 No Content |
-| Recurso no encontrado | 404 Not Found |
-| Dato duplicado (serial repetido) | 400 Bad Request |
-| Regla de negocio incumplida (dispositivo no disponible / préstamo ya devuelto) | 409 Conflict |
-| Error de validación | 422 Unprocessable Entity |
+### Registro con contraseña débil
 
----
+![Contraseña débil](imagenes/evo11/contrasena_debil.png)
 
-## Flujo de Git
+### Registro con email duplicado
 
-Todo el desarrollo se hizo sobre ramas `feature/*`, mergeadas a `develop` con `--no-ff`. Al cierre de la actividad, se creó la rama `device_systems_alembic_relaciones` desde la punta de `develop`, y se mergeó a `main` con `--no-ff`, tal como lo exige la guía.
+![Email duplicado](imagenes/evo11/correo_duplicado.png)
 
----
+### Login correcto y token generado
 
-## Reflexión
+![Login correcto](imagenes/evo11/login_correcto.png)
 
-Esta actividad me enseñó a tratar la base de datos como parte del código, no como algo fijo: cada cambio pasa por una migración con Alembic, que permite evolucionar el esquema sin perder los datos existentes. Modelar las relaciones entre User, Device y Loan me hizo pensar en reglas de negocio reales (validar disponibilidad, actualizar estados en cascada) en lugar de CRUDs aislados. Las consultas con joins y el manejo diferenciado de errores (400 vs 409) terminaron de darle a la API un comportamiento mucho más cercano a un sistema real que a un ejercicio académico.
+### Login con contraseña incorrecta
+
+![Contraseña incorrecta](imagenes/evo11/contrasena_incorrecta.png)
+
+### Consulta de /auth/me
+
+![Respuesta sin hashed_password](imagenes/evo11/auth_me.png)
+
+### Acceso a ruta protegida sin token
+
+![Error 401 sin token](imagenes/evo11/sin_token.png)
+
+### Acceso con token inválido
+
+![Error 401 token inválido](imagenes/evo11/token_invalido.png)
+
+### Acceso con usuario sin permisos
+
+![Error 403](imagenes/evo11/usuario_sin_permiso.png)
+
+### Creación de dispositivo con rol permitido
+
+![Dispositivo creado](imagenes/evo11/dispositivo_creado.png)
+
+### Eliminación de dispositivo con rol no permitido
+
+![Error 403 eliminación](imagenes/evo11/usuario_sin_permiso.png)
+
+### Configuración CORS
+
+![Cabeceras access-control](imagenes/evo11/cabeceras_cors.png)
+
+### Cabeceras generadas por middleware
+
+![X-App-Name, X-Process-Time, X-Request-ID](imagenes/evo11/cabeceras_middleware.png)
+
+### Activación de rate limiting
+
+![429 tras exceder el límite](imagenes/evo11/rate_limiting.png)
+
+### Swagger/OpenAPI con OAuth2
+
+![Swagger con candado en rutas protegidas](imagenes/evo11/swagger_openapi.png)
+
+## Reflexión final
+
+Esta actividad transformó `device_systems` en una API lista para producción. La diferencia clave no fue solo agregar login, sino cambiar la forma de pensar cada endpoint: ya no basta con que la lógica de negocio sea correcta, también hay que preguntarse *quién puede llamar a esta ruta*.
+
+Entender el flujo OAuth2 completo (por qué el token lleva `sub` y `exp`, por qué el login usa form-data en vez de JSON, y cómo encadenar dependencias como `require_roles` sin duplicar código) fue el mayor aprendizaje. La dificultad técnica más real fue la incompatibilidad entre `passlib` y versiones recientes de `bcrypt`, resuelta fijando `bcrypt==4.0.1` en `requirements.txt`.
+
+Como siguiente paso, se podrían agregar refresh tokens y un mecanismo de revocación, ya que por ahora un JWT robado sigue siendo válido hasta que expira por sí solo.
+
+## Autor
+
+jeferson estiven vargas
