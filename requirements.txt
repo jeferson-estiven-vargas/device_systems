@@ -22,3 +22,4 @@ python-jose[cryptography]
 passlib[bcrypt]
 slowapi
 python-multipart
+python-dotenv
