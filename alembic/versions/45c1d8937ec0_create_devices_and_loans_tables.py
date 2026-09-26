@@ -1,8 +1,8 @@
 """create devices and loans tables
 
-Revision ID: 022d291ed025
+Revision ID: 45c1d8937ec0
 Revises: 0001_baseline_users
-Create Date: 2026-09-19 12:25:55.134974
+Create Date: 2026-09-19 00:37:34.831167
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '022d291ed025'
+revision: str = '45c1d8937ec0'
 down_revision: Union[str, Sequence[str], None] = '0001_baseline_users'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
