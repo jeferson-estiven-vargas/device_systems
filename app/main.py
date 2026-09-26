@@ -13,7 +13,7 @@ app = FastAPI(
     title="device_systems API",
     description="API REST segura para la gestion de usuarios, dispositivos y prestamos del sistema device_systems, con autenticacion OAuth2/JWT, CORS, middleware de trazabilidad y rate limiting.",
     version="5.0.0",
-    contact={"name": "Juan Camilo Sarrazola", "email": "camilo@correo.com"},
+    contact={"name": "jeferson estiven vargas", "email": "estive@correo.com"},
     openapi_tags=[
         {"name": "Auth", "description": "Registro, login y consulta del usuario autenticado"},
         {"name": "Users", "description": "Operaciones sobre usuarios y su historial de prestamos"},
