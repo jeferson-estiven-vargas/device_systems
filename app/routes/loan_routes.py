@@ -1,8 +1,11 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
+from app.dependencies.auth_dependency import get_current_active_user, require_admin_or_support
 from app.dependencies.database_dependency import get_db
+from app.middlewares.rate_limiter import limiter
+from app.models.user_model import User
 from app.schemas.loan_schema import LoanCreate, LoanDetailResponse, LoanResponse
 from app.services import loan_service
 
@@ -13,14 +16,16 @@ router = APIRouter(prefix="/loans", tags=["Loans"])
     "/details",
     response_model=List[LoanDetailResponse],
     summary="Listar prestamos con informacion relacionada",
-    description="Combina loans, users y devices mediante JOIN, con filtros opcionales.",
+    description="Combina loans, users y devices mediante JOIN, con filtros opcionales. Requiere rol admin o support.",
     response_description="Prestamos con datos de usuario y dispositivo",
+    responses={401: {"description": "Token invalido, ausente o expirado"}, 403: {"description": "Rol sin permisos suficientes"}},
 )
 def listar_prestamos_detallados(
     status: Optional[str] = Query(None, description="Filtrar por estado: active, returned, overdue"),
     user_email: Optional[str] = Query(None, description="Filtrar por correo del usuario"),
     device_type: Optional[str] = Query(None, description="Filtrar por tipo de dispositivo"),
     db: Session = Depends(get_db),
+    _usuario_actual: User = Depends(require_admin_or_support),
 ):
     return loan_service.get_loans_with_details(db, status, user_email, device_type)
 
@@ -57,14 +62,16 @@ def obtener_prestamo(loan_id: int, db: Session = Depends(get_db)):
     response_model=LoanResponse,
     status_code=201,
     summary="Registrar un prestamo",
-    description="Valida que el usuario exista, el dispositivo exista y este disponible; marca el dispositivo como no disponible.",
+    description="Valida que el usuario exista, el dispositivo exista y este disponible; marca el dispositivo como no disponible. Requiere usuario autenticado.",
     response_description="Prestamo creado",
     responses={
+        401: {"description": "Token invalido, ausente o expirado"},
         404: {"description": "Usuario o dispositivo no encontrado"},
         409: {"description": "El dispositivo no esta disponible"},
     },
 )
-def crear_prestamo(loan: LoanCreate, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def crear_prestamo(request: Request, loan: LoanCreate, db: Session = Depends(get_db), _usuario_actual: User = Depends(get_current_active_user)):
     return loan_service.create_loan(db, loan)
 
 
@@ -72,12 +79,14 @@ def crear_prestamo(loan: LoanCreate, db: Session = Depends(get_db)):
     "/{loan_id}/return",
     response_model=LoanResponse,
     summary="Registrar la devolucion de un prestamo",
-    description="Marca el prestamo como returned, asigna la fecha de devolucion y libera el dispositivo.",
+    description="Marca el prestamo como returned, asigna la fecha de devolucion y libera el dispositivo. Requiere rol admin o support.",
     response_description="Prestamo devuelto",
     responses={
+        401: {"description": "Token invalido, ausente o expirado"},
+        403: {"description": "Rol sin permisos suficientes"},
         404: {"description": "Prestamo no encontrado"},
         409: {"description": "El prestamo ya fue devuelto"},
     },
 )
-def devolver_prestamo(loan_id: int, db: Session = Depends(get_db)):
+def devolver_prestamo(loan_id: int, db: Session = Depends(get_db), _usuario_actual: User = Depends(require_admin_or_support)):
     return loan_service.return_loan(db, loan_id)
